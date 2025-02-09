@@ -102,6 +102,7 @@ udpServer.on('message', (data, rinfo) => {
 wsServer.on("connection", (ws, req) => {
     const sign = req.socket.remoteAddress + "." + req.socket.remotePort;
     let uid = null;
+    console.log("Connected", sign);
     authUsers[sign] = {
         authTimer: setTimeout(
             () => {
@@ -114,7 +115,7 @@ wsServer.on("connection", (ws, req) => {
     };
 
     ws.on("message", (data, isBinary) => {
-        let jData = JSON.parse(data.join(""));
+        let jData = JSON.parse([...data].map(code => String.fromCharCode(code)).join(""));
         if(!authUsers[sign].auth) {
             if(jData.type === 0 && jData.auth === TOKEN) {
                 clearTimeout(authUsers[sign].authTimer);
