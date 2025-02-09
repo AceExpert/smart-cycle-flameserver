@@ -133,14 +133,14 @@ wsServer.on("connection", (ws, req) => {
                     authUsers[sign].voip = true;
                     for(let [key, id, uws] of getCurrentRoommates(sign)) {
                         if(key !== sign) {
-                            uws.send(JSON.stringify({'type': 0, 'status': 1, 'id': uid}));
+                            uws.send(JSON.stringify({'type': 2, 'status': 1, 'id': uid}));
                         };
                     }
                 } else if (jData.action === 0) {
                     authUsers[sign].voip = false;
                     for(let [key, id, uws] of getCurrentRoommates(sign)) {
                         if(key !== sign) {
-                            uws.send(JSON.stringify({'type': 0, 'status': 0, 'id': uid}));
+                            uws.send(JSON.stringify({'type': 2, 'status': 0, 'id': uid}));
                         };
                     }
                 }
@@ -187,4 +187,4 @@ wsServer.on("listening", () => {
     console.log("ws://:::3500/bolt is active");
 })
 
-udpServer.bind(3009);
+udpServer.bind(3500);
