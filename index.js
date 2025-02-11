@@ -88,11 +88,11 @@ udpServer.on('listening', () => {
 
 udpServer.on('message', (data, rinfo) => {
     Object.keys(authUsers).forEach(sign => {
-        if(authUsers[sign].auth && sign === rinfo.address + "." + rinfo.port) {
+        if(authUsers[sign].auth && sign === '::ffff:' + rinfo.address + "?" + rinfo.port) {
             for(let [key, ..._] of getCurrentRoommates(sign, true)) {
                 if(key !== sign) {
-                    let [addr, port] = key.split(".");
-                    udpServer.send(data, Number.parseInt(port), addr);
+                    let [addr, port] = key.split("?");
+                    udpServer.send(data, Number.parseInt(port), addr.split(':').slice(-1)[0]);
                 };
             }
         }
@@ -100,7 +100,7 @@ udpServer.on('message', (data, rinfo) => {
 });
 
 wsServer.on("connection", (ws, req) => {
-    const sign = req.socket.remoteAddress + "." + req.socket.remotePort;
+    const sign = req.socket.remoteAddress + "?" + req.socket.remotePort;
     let uid = null;
     console.log("Connected", sign);
     authUsers[sign] = {
@@ -173,10 +173,11 @@ wsServer.on("connection", (ws, req) => {
     })
 
     ws.on("close", () => {
+        console.log('Disconnected', sign)
         if(uid) {
-            for(let [key, id, ws] of getCurrentRoommates(sign)) {
+            for(let [key, id, uws] of getCurrentRoommates(sign)) {
                 if(key !== sign) {
-                    ws.send(JSON.stringify({'type': 0, 'status': 0, 'id': uid}));
+                    uws.send(JSON.stringify({'type': 0, 'status': 0, 'id': uid}));
                 };
             }
         };
