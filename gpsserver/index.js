@@ -1,17 +1,18 @@
 const net = require("net");
 
 let tokenMap = {
-    'hMrXDM0x6G': {addr: 'FF:FF:FF:FF:FF:FF', to_alert: false, to_gps: false}
+    'hMrXDM0x6G': {addr: 'ff:bc:cd:ff:ff:aa', phone: [], cycle: [], to_alert: false, to_gps: false}
 }
 
 function sendData(token, data) {
-    if(tokenMap[token].phone) {
-        if(!tokenMap[token].phone.closed) {
-            tokenMap[token].phone.write(data)
-            return true;
+    let i = 0;
+    for(let [_, phone_sock] of tokenMap[token].phone) {
+        if(!phone_sock.closed) {
+            phone_sock.write(data)
+            i++;
         }
     }
-    return false;
+    return i;
 }
 
 let server = net.createServer(socket => {
@@ -21,6 +22,7 @@ let server = net.createServer(socket => {
     let hbInterv = null;
     let authTimer = null;
     let hbTimer = null;
+    let session = Math.random().toString();
     let endConnection = () => {
         socket.end();
         socket.destroy();
@@ -37,10 +39,10 @@ let server = net.createServer(socket => {
                         clearTimeout(authTimer);
                         console.log("Authorized");
                         authToken = token;
-                        devType = args[1]
-                        tokenMap[token][args[1]] = socket;
+                        devType = args[1];
+                        tokenMap[token][args[1]].push([session, socket])
                         hbInterv = setInterval(() => {
-                            if(!socket.closed && tokenMap[token][args[1]]) {
+                            if(!socket.closed && tokenMap[token][args[1]].find(([tok]) => tok === session)) {
                                 socket.write(".hb\n")
                             };
                         }, 45000)
@@ -78,8 +80,8 @@ let server = net.createServer(socket => {
                         if(!sendData(token, tokenMap[token].location)) {
                             tokenMap[token].to_gps = true;
                         };
+                        break;
                     }
-                    break
                 }
                 break;
             }
@@ -92,8 +94,8 @@ let server = net.createServer(socket => {
                         if(!sendData(token, "$alert\n")) {
                             tokenMap[token].to_alert = true;
                         };
+                        break;
                     }
-                    break
                 }
                 break;
             }
@@ -105,12 +107,16 @@ let server = net.createServer(socket => {
             clearInterval(hbInterv);
         };
         if(authToken)
-            tokenMap[authToken][devType] = undefined;
+            tokenMap[authToken][devType] = tokenMap[authToken][devType].filter(([tok]) => tok !== session); 
+        try {
+            endConnection();
+        } catch {};
     };
     socket.on("end", clearRecord);
     socket.on("close", clearRecord);
+    socket.on("error", clearRecord);
 });
 
-server.listen(3100, "0.0.0.0", () => {
+server.listen(3121, "0.0.0.0", () => {
     console.log("GPS Server up");
 });
