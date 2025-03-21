@@ -8,7 +8,7 @@ function sendData(token, data) {
     let i = 0;
     for(let [_, phone_sock] of tokenMap[token].phone) {
         if(!phone_sock.closed) {
-            phone_sock.write(data)
+            phone_sock.write(data + '\n')
             i++;
         }
     }
@@ -30,76 +30,81 @@ let server = net.createServer(socket => {
     authTimer = setTimeout(endConnection, 20000);
     socket.on("data", d => {
         let data = [...d].map(code => String.fromCharCode(code)).join("");
-        let args = data.split(' ');
-        if(!authToken && args[0] !== '$auth') endConnection();
-        switch (args[0]) {
-            case '$auth': {
-                for(let token of Object.keys(tokenMap)) {
-                    if((token === args[3] && tokenMap[token].addr === args[2] && args[1] === 'cycle') || (token === args[2] && tokenMap[token].addr === args[3] && args[1] === 'phone')) {
-                        clearTimeout(authTimer);
-                        console.log("Authorized");
-                        authToken = token;
-                        devType = args[1];
-                        tokenMap[token][args[1]].push([session, socket])
-                        hbInterv = setInterval(() => {
-                            if(!socket.closed && tokenMap[token][args[1]].find(([tok]) => tok === session)) {
-                                socket.write(".hb\n")
-                            };
-                        }, 45000)
-                        hbTimer = setTimeout(endConnection, 60000);
-                        if(args[1] === 'phone') {
-                            if(tokenMap[token].to_gps) {
-                                tokenMap[token].to_gps = false;
-                                sendData(token, tokenMap[token].location);
+        let commands = data.split('\n');
+
+        commands.forEach(cmd => {
+            let args = cmd.split(' ').filter(d => d.trim().length);
+            if(!args.length) return;
+            if(!authToken && args[0] !== '$auth') endConnection();
+            switch (args[0]) {
+                case '$auth': {
+                    for(let token of Object.keys(tokenMap)) {
+                        if((token === args[3] && tokenMap[token].addr === args[2] && args[1] === 'cycle') || (token === args[2] && tokenMap[token].addr === args[3] && args[1] === 'phone')) {
+                            clearTimeout(authTimer);
+                            console.log("Authorized");
+                            authToken = token;
+                            devType = args[1];
+                            tokenMap[token][args[1]].push([session, socket])
+                            hbInterv = setInterval(() => {
+                                if(!socket.closed && tokenMap[token][args[1]].find(([tok]) => tok === session)) {
+                                    socket.write(".hb\n")
+                                };
+                            }, 45000)
+                            hbTimer = setTimeout(endConnection, 60000);
+                            if(args[1] === 'phone') {
+                                if(tokenMap[token].to_gps) {
+                                    tokenMap[token].to_gps = false;
+                                    sendData(token, tokenMap[token].location);
+                                }
+                                if(tokenMap[token].to_alert) {
+                                    tokenMap[token].to_alert = false;
+                                    sendData(token, '$alert');
+                                }
                             }
-                            if(tokenMap[token].to_alert) {
-                                tokenMap[token].to_alert = false;
-                                sendData(token, '$alert\n');
-                            }
+                        } else {
                         }
-                    } else {
+                        break;
                     }
                     break;
                 }
-                break;
-            }
 
-            case '.hb': {
-                clearTimeout(hbTimer);
-                hbTimer = setTimeout(endConnection, 60000);
-                break;
-            }
-
-            case '$gps': {
-                clearTimeout(hbTimer);
-                hbTimer = setTimeout(endConnection, 60000);
-
-                for(let token of Object.keys(tokenMap)) {
-                    if(token === args[1]) {
-                        tokenMap[token].location = args.slice(2).join(' ')
-                        if(!sendData(token, tokenMap[token].location)) {
-                            tokenMap[token].to_gps = true;
-                        };
-                        break;
-                    }
+                case '.hb': {
+                    clearTimeout(hbTimer);
+                    hbTimer = setTimeout(endConnection, 60000);
+                    break;
                 }
-                break;
-            }
-            case '$alert': {
-                clearTimeout(hbTimer);
-                hbTimer = setTimeout(endConnection, 60000);
-                
-                for(let token of Object.keys(tokenMap)) {
-                    if(token === args[1]) {
-                        if(!sendData(token, "$alert\n")) {
-                            tokenMap[token].to_alert = true;
-                        };
-                        break;
+
+                case '$gps': {
+                    clearTimeout(hbTimer);
+                    hbTimer = setTimeout(endConnection, 60000);
+
+                    for(let token of Object.keys(tokenMap)) {
+                        if(token === args[1]) {
+                            tokenMap[token].location = args.slice(2).join(' ')
+                            if(!sendData(token, tokenMap[token].location)) {
+                                tokenMap[token].to_gps = true;
+                            };
+                            break;
+                        }
                     }
+                    break;
                 }
-                break;
+                case '$alert': {
+                    clearTimeout(hbTimer);
+                    hbTimer = setTimeout(endConnection, 60000);
+                    
+                    for(let token of Object.keys(tokenMap)) {
+                        if(token === args[1]) {
+                            if(!sendData(token, "$alert")) {
+                                tokenMap[token].to_alert = true;
+                            };
+                            break;
+                        }
+                    }
+                    break;
+                }
             }
-        }
+        });
     })
     let clearRecord = () => {
         console.log("End of", `${socket.remoteAddress}:${socket.remotePort}`);
